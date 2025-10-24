@@ -27,9 +27,8 @@ public class CourseService {
 
     }
 
-    // Create course: validate fields, convert mediums -> medium column
     public Course createCourse(Course course) {
-        // Field-level checks (individual messages)
+        // Validate required fields
         if (course.getName() == null || course.getName().isBlank())
             throw new BadRequestException("Name is required");
         if (course.getDescription() == null || course.getDescription().isBlank())
@@ -43,16 +42,26 @@ public class CourseService {
         if (course.getSubject() == null || course.getSubject().isBlank())
             throw new BadRequestException("Subject is required");
 
-        // convert mediums list to CSV string for existing 'medium' column
-        course.setMedium(mediumConverter.convertToDatabaseColumn(course.getMediums()));
+        // Convert List<Enums.Medium> to CSV string
+        try {
+            course.setMedium(mediumConverter.convertToDatabaseColumn(course.getMediums()));
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid mediums provided");
+        }
 
+        // Ensure units list is initialized
         if (course.getUnits() == null)
             course.setUnits(new ArrayList<>());
 
         Course saved = courseRepository.save(course);
+
+        // Populate transient mediums for outgoing JSON
+        saved.setMediums(mediumConverter.convertToEntityAttribute(saved.getMedium()));
+
         logger.info("Created course: {} (id={})", saved.getName(), saved.getId());
         return saved;
     }
+
 
     // Read single
     public Course getCourseById(UUID courseId) {
@@ -131,21 +140,7 @@ public class CourseService {
         return saved;
     }
 
-//    // Delete
-//    public void deleteCourse(UUID courseId) {
-//        if (!courseRepository.existsById(courseId)) throw new NotFoundException("Course not found with id: " + courseId);
-//        courseRepository.deleteById(courseId);
-//        logger.info("Deleted course (id={})", courseId);
-//    }
-//    public void deleteCourse(UUID courseId) {
-//        Course course = courseRepository.findById(courseId)
-//                .orElseThrow(() -> new NotFoundException("Course not found"));
-//
-//        // Nullify course reference in units
-//        course.getUnits().forEach(unit -> unit.setCourse(null));
-//
-//        courseRepository.delete(course);
-//    }
+
     public void deleteCourse(UUID courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new NotFoundException("Course not found"));
@@ -165,12 +160,8 @@ public class CourseService {
 
 
 
-    /**
-     * Pagination + filter + search + sort
-     * - This method uses repository pageable to fetch pages (so DB-level paging).
-     * - Then it applies in-memory filtering/search on that page content, and returns a PageImpl.
-     *   (This avoids loading the entire DB at once, but for heavy filtering across whole DB use Specifications.)
-     */
+   //Pagination + filter + search + sort
+
     public Page<Course> filterSearchSortPageable(String board, String grade, String subject,
                                                  String search, String orderBy, String direction,
                                                  Pageable pageable) {

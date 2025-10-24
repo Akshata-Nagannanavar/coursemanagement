@@ -84,3 +84,4 @@ public class CourseController {
         return ResponseEntity.ok(ResponseUtil.successWithData("api.course.delete", result));
     }
 }
+
